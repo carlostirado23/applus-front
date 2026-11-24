@@ -10,7 +10,19 @@ import { hoy } from '../utils/programaciones';
 /** "YYYY-MM-01" del mes actual en hora local. */
 const inicioDeMes = () => `${hoy().slice(0, 7)}-01`;
 
-const filtrosIniciales = () => ({ fecha_inicial: inicioDeMes(), fecha_final: hoy(), agrupar: 'tecnico', tecnico_id: '' });
+const CAMPOS_FECHA = {
+  fecha_estimada_resolucion: 'Fecha estimada de resolución',
+  fecha_publicacion: 'Fecha de publicación',
+  fecha_ejecucion: 'Fecha de ejecución',
+};
+
+const filtrosIniciales = () => ({
+  campo_fecha: 'fecha_estimada_resolucion',
+  fecha_inicial: inicioDeMes(),
+  fecha_final: hoy(),
+  agrupar: 'tecnico',
+  tecnico_id: '',
+});
 
 const colorCumplimiento = (pct) => (pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500');
 
@@ -89,7 +101,15 @@ const Reportes = () => {
       <Alerta mensaje={mensaje} />
 
       <form className={`${tarjeta} mb-6`} onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label htmlFor="campo_fecha" className={label}>Filtrar fecha por</label>
+            <select id="campo_fecha" value={filtros.campo_fecha} onChange={setFiltro('campo_fecha')} className={input}>
+              {Object.entries(CAMPOS_FECHA).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label htmlFor="fecha_inicial" className={label}>Desde</label>
             <input id="fecha_inicial" type="date" value={filtros.fecha_inicial} max={filtros.fecha_final || undefined} onChange={setFiltro('fecha_inicial')} className={input} />
@@ -120,9 +140,24 @@ const Reportes = () => {
             <Icon name="download" className="w-4 h-4" />
             {busy ? 'Descargando...' : 'Descargar Excel'}
           </button>
+          {(filtros.fecha_inicial || filtros.fecha_final) && (
+            <button
+              type="button"
+              onClick={() => {
+                const sinFechas = { ...filtros, fecha_inicial: '', fecha_final: '' };
+                setFiltros(sinFechas);
+                generar(sinFechas);
+              }}
+              disabled={loading}
+              className={btn.secundario}
+            >
+              <Icon name="x" className="w-4 h-4" />
+              Quitar fechas
+            </button>
+          )}
         </div>
         <p className="mt-3 text-xs text-gray-500">
-          El rango de fechas filtra por la fecha estimada de resolución de las OS publicadas.
+          Solo cuenta OS publicadas. El rango aplica sobre la {CAMPOS_FECHA[filtros.campo_fecha].toLowerCase()}; sin fechas se incluyen todas.
         </p>
       </form>
 
@@ -149,7 +184,14 @@ const Reportes = () => {
             <div className={spinner} />
           </div>
         ) : !reporte?.detalle?.length ? (
-          <p className="px-4 py-8 text-center text-gray-500">No hay OS publicadas en ese rango con esos filtros.</p>
+          <div className="px-4 py-8 text-center text-gray-500">
+            <p>No hay OS publicadas que cumplan los filtros.</p>
+            {(reporte?.fecha_inicial || reporte?.fecha_final) && (
+              <p className="mt-1 text-sm">
+                El rango aplica sobre la {CAMPOS_FECHA[reporte.campo_fecha]?.toLowerCase() || 'fecha estimada'}. Prueba otro campo de fecha o usa <strong>Quitar fechas</strong>.
+              </p>
+            )}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
