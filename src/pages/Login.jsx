@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AuthLayout from '../components/AuthLayout';
 import PasswordInput from '../components/PasswordInput';
+
+const inputClass =
+  'w-full pl-11 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500';
+
+const iconClass = 'pointer-events-none absolute left-3.5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-gray-400';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -45,24 +51,41 @@ const Login = () => {
   if (user) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Bienvenido</h1>
-          <p className="text-gray-600">Inicia sesión en tu cuenta</p>
+    <AuthLayout
+      title="Bienvenido"
+      subtitle="Inicia sesión para gestionar las programaciones."
+      footer={
+        <>
+          ¿No tienes cuenta?{' '}
+          <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700 hover:underline">
+            Regístrate aquí
+          </Link>
+        </>
+      }
+    >
+      {error && (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
+          <svg className="mt-0.5 h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+          </svg>
+          <span>{error}</span>
         </div>
+      )}
 
-        {error && (
-          <div role="alert" className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="usuario" className="block text-sm font-medium text-gray-700 mb-2">
-              Usuario
-            </label>
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <div>
+          <label htmlFor="usuario" className="mb-2 block text-sm font-medium text-gray-700">
+            Usuario
+          </label>
+          <div className="relative">
+            <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
             <input
               type="text"
               id="usuario"
@@ -71,52 +94,49 @@ const Login = () => {
               autoFocus
               value={formData.usuario}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className={inputClass}
               placeholder="Ingresa tu usuario"
             />
           </div>
+        </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Contraseña
-            </label>
+        <div>
+          <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
+            Contraseña
+          </label>
+          <div className="relative">
+            <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
             <PasswordInput
               id="password"
               name="password"
               autoComplete="current-password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className={inputClass}
               placeholder="Ingresa tu contraseña"
             />
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></span>
-                Iniciando sesión...
-              </span>
-            ) : (
-              'Iniciar Sesión'
-            )}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
-            ¿No tienes cuenta?{' '}
-            <Link to="/register" className="text-blue-500 hover:text-blue-600 font-medium">
-              Regístrate aquí
-            </Link>
-          </p>
         </div>
-      </div>
-    </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-xl bg-brand-600 px-4 py-3 font-semibold text-white shadow-lg shadow-brand-600/30 transition-all cursor-pointer hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+              Iniciando sesión...
+            </span>
+          ) : (
+            'Iniciar Sesión'
+          )}
+        </button>
+      </form>
+    </AuthLayout>
   );
 };
 

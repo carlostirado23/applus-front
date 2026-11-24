@@ -6,7 +6,7 @@ const PasswordInput = ({ className = '', ...props }) => {
 
   return (
     <div className="relative">
-      <input {...props} type={visible ? 'text' : 'password'} className={`${className} pr-12`} />
+      <input {...props} type={visible ? 'text' : 'password'} className={`${className} pr-12!`} />
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}

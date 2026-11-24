@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AuthLayout from '../components/AuthLayout';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -72,15 +73,22 @@ const Register = () => {
   if (user) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Crear Cuenta</h1>
-          <p className="text-gray-600">Regístrate para comenzar</p>
-        </div>
+    <AuthLayout
+      title="Crear Cuenta"
+      subtitle="Regístrate para comenzar."
+      footer={
+        <>
+          ¿Ya tienes cuenta?{' '}
+          <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700 hover:underline">
+            Inicia sesión aquí
+          </Link>
+        </>
+      }
+    >
+      <>
 
         {error && (
-          <div role="alert" className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div role="alert" className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
             {error}
           </div>
         )}
@@ -98,7 +106,7 @@ const Register = () => {
               autoFocus
               value={formData.nombre}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:outline-none focus:ring-brand-500/40 focus:border-brand-500 transition-all"
               placeholder="Ingresa tu nombre"
             />
           </div>
@@ -114,7 +122,7 @@ const Register = () => {
               autoComplete="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:outline-none focus:ring-brand-500/40 focus:border-brand-500 transition-all"
               placeholder="correo@ejemplo.com"
             />
           </div>
@@ -130,7 +138,7 @@ const Register = () => {
               autoComplete="username"
               value={formData.usuario}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:outline-none focus:ring-brand-500/40 focus:border-brand-500 transition-all"
               placeholder="Elige un usuario"
             />
           </div>
@@ -146,7 +154,7 @@ const Register = () => {
               autoComplete="new-password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:outline-none focus:ring-brand-500/40 focus:border-brand-500 transition-all"
               placeholder="Mínimo 8 caracteres"
             />
           </div>
@@ -162,7 +170,7 @@ const Register = () => {
               autoComplete="new-password"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:outline-none focus:ring-brand-500/40 focus:border-brand-500 transition-all"
               placeholder="Confirma tu contraseña"
             />
           </div>
@@ -170,7 +178,7 @@ const Register = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+            className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-6"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -182,17 +190,8 @@ const Register = () => {
             )}
           </button>
         </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
-            ¿Ya tienes cuenta?{' '}
-            <Link to="/login" className="text-green-500 hover:text-green-600 font-medium">
-              Inicia sesión aquí
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+      </>
+    </AuthLayout>
   );
 };
 

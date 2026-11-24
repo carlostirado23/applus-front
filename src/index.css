@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Naranja corporativo. Cambiar aquí ajusta toda la app (clases brand-*). */
+@theme {
+  --color-brand-50: #fff5ed;
+  --color-brand-100: #ffe8d4;
+  --color-brand-200: #ffcda8;
+  --color-brand-300: #ffa970;
+  --color-brand-400: #ff8438;
+  --color-brand-500: #f56a0f;
+  --color-brand-600: #dc5406;
+  --color-brand-700: #b64008;
+  --color-brand-800: #91340e;
+  --color-brand-900: #752d0f;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
