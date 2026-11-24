@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { InsertarBadge, ValidacionBadge } from "../components/Badges";
+import Icon from "../components/Icon";
 import {
     fetchProgramaciones,
     finDelDia,
@@ -89,7 +90,7 @@ const Historico = () => {
 
     const hayFiltros = Boolean(searchTerm || rango.fechaInicio || rango.fechaFin);
     const inputFecha =
-        "w-full px-4 py-2 font-medium text-gray-800 transition-all bg-white border border-blue-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-500";
+        "w-full px-4 py-2 font-medium text-gray-800 transition-all bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500";
 
     return (
         <>
@@ -143,14 +144,14 @@ const Historico = () => {
                             placeholder="Buscar por OS, nombre, municipio, formulario, creador o asignado..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
                         />
                     </div>
                     <button
                         type="submit"
                         disabled={loading || rangoInvalido}
-                        className="flex items-center justify-center w-full px-6 py-2 mt-2 font-semibold text-white transition-colors bg-blue-500 rounded-lg cursor-pointer sm:w-auto hover:bg-blue-600 sm:mt-0 sm:ml-4 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <span className="mr-2">🔍</span> Buscar
+                        className="flex items-center justify-center w-full px-6 py-2 mt-2 font-semibold text-white transition-colors bg-brand-600 rounded-lg cursor-pointer sm:w-auto hover:bg-brand-700 sm:mt-0 sm:ml-4 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Icon name="search" className="w-4 h-4 mr-2" /> Buscar
                     </button>
                     {hayFiltros && (
                         <button
@@ -169,7 +170,7 @@ const Historico = () => {
             <div className="overflow-hidden bg-white shadow-md rounded-xl">
                 {loading ? (
                     <div className="flex items-center justify-center py-12">
-                        <div className="w-12 h-12 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin"></div>
+                        <div className="w-10 h-10 border-4 border-brand-100 border-t-brand-500 rounded-full animate-spin"></div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">

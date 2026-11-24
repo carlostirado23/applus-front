@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { apiFetch } from "../api/client";
 import { InsertarBadge, ValidacionBadge } from "../components/Badges";
+import Icon from "../components/Icon";
 import { esInsertar, fetchProgramaciones, formatFecha, tieneValidacion } from "../utils/programaciones";
 
 const MAX_EXCEL_BYTES = 10 * 1024 * 1024; // límite del backend
@@ -149,7 +150,7 @@ const Precargar = () => {
 
     const isBusy = busy !== "";
     const boton =
-        "flex-1 px-6 py-3 font-semibold text-white transition-colors rounded-lg cursor-pointer sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed";
+        "flex flex-1 items-center justify-center gap-2 px-5 py-2.5 font-semibold text-white transition-colors rounded-lg cursor-pointer sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed";
 
     return (
         <>
@@ -178,15 +179,17 @@ const Precargar = () => {
                         type="button"
                         onClick={handleDescargarPlantilla}
                         disabled={isBusy}
-                        className={`${boton} bg-blue-500 hover:bg-blue-600`}>
-                        📥 {busy === "plantilla" ? "Descargando..." : "Descargar Plantilla"}
+                        className={`${boton} bg-white text-gray-700! border border-gray-300 hover:bg-gray-50 hover:border-gray-400`}>
+                        <Icon name="download" className="w-4 h-4" />
+                        {busy === "plantilla" ? "Descargando..." : "Descargar Plantilla"}
                     </button>
 
                     <label
-                        className={`flex-1 px-6 py-3 font-semibold text-center text-white transition-colors bg-green-500 rounded-lg sm:flex-none focus-within:ring-2 focus-within:ring-green-300 ${
-                            isBusy ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-green-600"
+                        className={`flex flex-1 items-center justify-center gap-2 px-5 py-2.5 font-semibold text-white transition-colors bg-gray-800 rounded-lg sm:flex-none focus-within:ring-2 focus-within:ring-brand-500/50 ${
+                            isBusy ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-gray-900"
                         }`}>
-                        📤 {busy === "excel" ? "Cargando..." : "Cargar Excel"}
+                        <Icon name="upload" className="w-4 h-4" />
+                        {busy === "excel" ? "Cargando..." : "Cargar Excel"}
                         <input
                             type="file"
                             accept=".xlsx"
@@ -200,21 +203,24 @@ const Precargar = () => {
                         type="button"
                         onClick={handleSelectAll}
                         disabled={publicables.length === 0 || isBusy}
-                        className={`${boton} bg-gray-500 hover:bg-gray-600`}>
-                        {allSelected ? "☑️ Deseleccionar Todos" : "☑️ Seleccionar Todos"}
+                        className={`${boton} bg-white text-gray-700! border border-gray-300 hover:bg-gray-50 hover:border-gray-400`}>
+                        <Icon name="checkSquare" className="w-4 h-4" />
+                        {allSelected ? "Deseleccionar Todos" : "Seleccionar Todos"}
                     </button>
 
                     <button
                         type="button"
                         onClick={handlePublicar}
                         disabled={selectedIds.length === 0 || isBusy}
-                        className={`${boton} bg-orange-500 hover:bg-orange-600`}>
-                        🚀 {busy === "publicar" ? "Publicando..." : `Publicar (${selectedIds.length})`}
+                        className={`${boton} bg-brand-600 hover:bg-brand-700 shadow-md shadow-brand-600/30 disabled:shadow-none sm:ml-auto`}>
+                        <Icon name="send" className="w-4 h-4" />
+                        {busy === "publicar" ? "Publicando..." : `Publicar (${selectedIds.length})`}
                     </button>
                 </div>
                 {duplicadas > 0 && (
-                    <p className="mt-3 text-sm text-yellow-800">
-                        ⚠️ {duplicadas} OS duplicada{duplicadas === 1 ? "" : "s"} en la lista: quedan como histórico y no se
+                    <p className="flex items-start gap-2 mt-3 text-sm text-yellow-800">
+                        <Icon name="alert" className="w-4 h-4 mt-0.5" />
+                        {duplicadas} OS duplicada{duplicadas === 1 ? "" : "s"} en la lista: quedan como histórico y no se
                         pueden publicar.
                     </p>
                 )}
@@ -223,7 +229,7 @@ const Precargar = () => {
             <div className="overflow-hidden bg-white shadow-md rounded-xl">
                 {loadingList ? (
                     <div className="flex items-center justify-center py-12">
-                        <div className="w-12 h-12 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin"></div>
+                        <div className="w-10 h-10 border-4 border-brand-100 border-t-brand-500 rounded-full animate-spin"></div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -237,7 +243,7 @@ const Precargar = () => {
                                             checked={allSelected}
                                             disabled={publicables.length === 0}
                                             onChange={handleSelectAll}
-                                            className="text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            className="w-4 h-4 cursor-pointer accent-brand-600"
                                         />
                                     </th>
                                     {COLUMNAS.map((columna) => (
@@ -271,7 +277,7 @@ const Precargar = () => {
                                                         checked={selectedIds.includes(prog.id)}
                                                         disabled={!publicable}
                                                         onChange={() => handleSelectOne(prog.id)}
-                                                        className="text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                                        className="w-4 h-4 cursor-pointer accent-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
                                                     />
                                                 </td>
                                                 <td className="px-4 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">

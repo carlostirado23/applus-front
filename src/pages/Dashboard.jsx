@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import Icon from '../components/Icon';
 import { esInsertar, fetchProgramaciones, tieneValidacion } from '../utils/programaciones';
 
 const Dashboard = () => {
@@ -20,14 +21,14 @@ const Dashboard = () => {
     programaciones ? programaciones.filter((p) => tieneValidacion(p, estado)).length : null;
 
   const stats = [
-    { title: 'Total Programaciones', value: programaciones?.length ?? null, color: 'bg-blue-500', icon: '📊' },
-    { title: 'Pendientes por publicar', value: contar('PENDIENTE'), color: 'bg-yellow-500', icon: '⏳' },
-    { title: 'Publicadas', value: contar('PUBLICADO'), color: 'bg-green-500', icon: '✅' },
+    { title: 'Total Programaciones', value: programaciones?.length ?? null, color: 'bg-brand-100 text-brand-600', icon: 'layers' },
+    { title: 'Pendientes por publicar', value: contar('PENDIENTE'), color: 'bg-amber-100 text-amber-600', icon: 'clock' },
+    { title: 'Publicadas', value: contar('PUBLICADO'), color: 'bg-green-100 text-green-600', icon: 'checkCircle' },
     {
       title: 'OS duplicadas',
       value: programaciones ? programaciones.filter((p) => !esInsertar(p.insertar)).length : null,
-      color: 'bg-red-500',
-      icon: '⚠️',
+      color: 'bg-red-100 text-red-600',
+      icon: 'alert',
     },
   ];
 
@@ -51,8 +52,8 @@ const Dashboard = () => {
             className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center text-2xl`}>
-                {stat.icon}
+              <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
+                <Icon name={stat.icon} className="w-6 h-6" />
               </div>
             </div>
             <h3 className="text-gray-600 text-sm font-medium mb-1">{stat.title}</h3>
@@ -68,17 +69,23 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             to="/precargar"
-            className="block p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+            className="flex items-start gap-3 p-4 bg-brand-50 hover:bg-brand-100 border border-brand-100 rounded-lg transition-colors"
           >
-            <h3 className="font-semibold text-blue-900 mb-1">Precargar Programación</h3>
-            <p className="text-sm text-blue-700">Cargar nuevos datos desde Excel</p>
+            <Icon name="upload" className="w-5 h-5 mt-0.5 text-brand-600" />
+            <span>
+              <span className="block font-semibold text-brand-900 mb-1">Precargar Programación</span>
+              <span className="block text-sm text-brand-800">Cargar nuevos datos desde Excel</span>
+            </span>
           </Link>
           <Link
             to="/historico"
-            className="block p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+            className="flex items-start gap-3 p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
           >
-            <h3 className="font-semibold text-green-900 mb-1">Ver Histórico</h3>
-            <p className="text-sm text-green-700">Consultar programaciones publicadas</p>
+            <Icon name="calendar" className="w-5 h-5 mt-0.5 text-gray-600" />
+            <span>
+              <span className="block font-semibold text-gray-900 mb-1">Ver Histórico</span>
+              <span className="block text-sm text-gray-600">Consultar programaciones publicadas</span>
+            </span>
           </Link>
         </div>
       </div>

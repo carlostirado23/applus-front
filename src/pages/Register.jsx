@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/AuthLayout';
+import PasswordInput from '../components/PasswordInput';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -147,8 +148,7 @@ const Register = () => {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               Contraseña
             </label>
-            <input
-              type="password"
+            <PasswordInput
               id="password"
               name="password"
               autoComplete="new-password"
@@ -163,8 +163,7 @@ const Register = () => {
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
               Confirmar Contraseña
             </label>
-            <input
-              type="password"
+            <PasswordInput
               id="confirmPassword"
               name="confirmPassword"
               autoComplete="new-password"

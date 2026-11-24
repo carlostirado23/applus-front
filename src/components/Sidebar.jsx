@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import Icon from './Icon';
 
 const menuItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/dashboard', label: 'Dashboard', icon: 'grid' },
   {
     label: 'Programación',
-    icon: '📅',
+    icon: 'calendar',
     submenu: [
       { path: '/precargar', label: 'Precargar' },
       { path: '/historico', label: 'Histórico' },
@@ -44,7 +45,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-6 border-b border-gray-800">
-            <h1 className="text-xl font-bold">Admin System</h1>
+            <div>
+              <p className="text-2xl font-extrabold tracking-tight leading-none">
+                Applus<sup className="font-black text-brand-500">+</sup>
+              </p>
+              <p className="mt-1 text-xs text-gray-400">Sistema Administrativo</p>
+            </div>
             <button
               type="button"
               onClick={closeSidebar}
@@ -66,16 +72,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     className="w-full flex items-center justify-between px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors cursor-pointer"
                   >
                     <span className="flex items-center gap-3">
-                      <span className="text-xl">{item.icon}</span>
+                      <Icon name={item.icon} />
                       <span>{item.label}</span>
                     </span>
-                    <span
-                      className={`transform transition-transform ${
-                        openMenus[item.label] ? 'rotate-180' : ''
-                      }`}
-                    >
-                      ▼
-                    </span>
+                    <Icon
+                      name="chevronDown"
+                      className={`w-4 h-4 transition-transform ${openMenus[item.label] ? 'rotate-180' : ''}`}
+                    />
                   </button>
                   {openMenus[item.label] && (
                     <div className="bg-gray-800">
@@ -86,7 +89,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                           onClick={closeSidebar}
                           className={({ isActive }) =>
                             `block px-6 py-3 pl-16 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors ${
-                              isActive ? 'bg-gray-700 text-white border-l-4 border-blue-500' : ''
+                              isActive ? 'bg-gray-700 text-white border-l-4 border-brand-500' : ''
                             }`
                           }
                         >
@@ -103,11 +106,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                   onClick={closeSidebar}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors ${
-                      isActive ? 'bg-gray-800 text-white border-l-4 border-blue-500' : ''
+                      isActive ? 'bg-gray-800 text-white border-l-4 border-brand-500' : ''
                     }`
                   }
                 >
-                  <span className="text-xl">{item.icon}</span>
+                  <Icon name={item.icon} />
                   <span>{item.label}</span>
                 </NavLink>
               )
