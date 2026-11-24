@@ -1,27 +1,24 @@
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 const Navbar = ({ toggleSidebar }) => {
+  // Al cerrar sesión, PrivateRoute redirige a /login.
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   return (
     <nav className="bg-white shadow-md px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-4">
         <button
+          type="button"
           onClick={toggleSidebar}
-          className="lg:hidden text-gray-600 hover:text-gray-900 focus:outline-none"
+          aria-label="Abrir menú"
+          className="lg:hidden text-gray-600 hover:text-gray-900 cursor-pointer"
         >
           <svg
             className="w-6 h-6"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -43,8 +40,9 @@ const Navbar = ({ toggleSidebar }) => {
         </div>
 
         <button
-          onClick={handleLogout}
-          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
+          type="button"
+          onClick={logout}
+          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium cursor-pointer"
         >
           Salir
         </button>

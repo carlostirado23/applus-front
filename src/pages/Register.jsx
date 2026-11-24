@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
@@ -14,7 +14,7 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { user, register, login } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -35,6 +35,12 @@ const Register = () => {
       return;
     }
 
+    if (formData.password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
+      setLoading(false);
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('Las contraseñas no coinciden');
       setLoading(false);
@@ -48,14 +54,22 @@ const Register = () => {
       formData.password
     );
 
-    if (result.success) {
-      navigate('/dashboard');
-    } else {
+    if (!result.success) {
       setError(result.error || 'Error al registrarse');
+    } else if (!result.data?.token) {
+      // /auth/register no devuelve token: se inicia sesión con las mismas credenciales.
+      const sesion = await login(formData.usuario.trim(), formData.password);
+      if (!sesion.success) {
+        navigate('/login', { replace: true });
+        return;
+      }
     }
+    // Con sesión, `user` cambia y el componente redirige solo al dashboard.
 
     setLoading(false);
   };
+
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center p-4">
@@ -66,7 +80,7 @@ const Register = () => {
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div role="alert" className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
           </div>
         )}
@@ -80,6 +94,8 @@ const Register = () => {
               type="text"
               id="nombre"
               name="nombre"
+              autoComplete="name"
+              autoFocus
               value={formData.nombre}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
@@ -95,6 +111,7 @@ const Register = () => {
               type="email"
               id="email"
               name="email"
+              autoComplete="email"
               value={formData.email}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
@@ -110,6 +127,7 @@ const Register = () => {
               type="text"
               id="usuario"
               name="usuario"
+              autoComplete="username"
               value={formData.usuario}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
@@ -125,10 +143,11 @@ const Register = () => {
               type="password"
               id="password"
               name="password"
+              autoComplete="new-password"
               value={formData.password}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-              placeholder="Crea una contraseña"
+              placeholder="Mínimo 8 caracteres"
             />
           </div>
 
@@ -140,6 +159,7 @@ const Register = () => {
               type="password"
               id="confirmPassword"
               name="confirmPassword"
+              autoComplete="new-password"
               value={formData.confirmPassword}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
@@ -150,11 +170,11 @@ const Register = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-6"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></span>
                 Registrando...
               </span>
             ) : (

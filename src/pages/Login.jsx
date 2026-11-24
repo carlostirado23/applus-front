@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PasswordInput from '../components/PasswordInput';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -10,8 +11,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const navigate = useNavigate();
-  const { login } = useAuth();
+  const { user, login } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -34,14 +34,15 @@ const Login = () => {
 
     const result = await login(formData.usuario, formData.password);
 
-    if (result.success) {
-      navigate('/dashboard');
-    } else {
+    // Si fue exitoso, `user` cambia y el componente redirige solo.
+    if (!result.success) {
       setError(result.error || 'Error al iniciar sesión');
     }
 
     setLoading(false);
   };
+
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
@@ -52,7 +53,7 @@ const Login = () => {
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div role="alert" className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
           </div>
         )}
@@ -66,6 +67,8 @@ const Login = () => {
               type="text"
               id="usuario"
               name="usuario"
+              autoComplete="username"
+              autoFocus
               value={formData.usuario}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -77,10 +80,10 @@ const Login = () => {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               Contraseña
             </label>
-            <input
-              type="password"
+            <PasswordInput
               id="password"
               name="password"
+              autoComplete="current-password"
               value={formData.password}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -91,11 +94,11 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></span>
                 Iniciando sesión...
               </span>
             ) : (

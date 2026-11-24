@@ -1,12 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Precargar from './pages/Precargar';
 import Historico from './pages/Historico';
-import "./index.css";
 
 function App() {
   return (
@@ -17,34 +17,18 @@ function App() {
           <Route path="/register" element={<Register />} />
 
           <Route
-            path="/dashboard"
             element={
               <PrivateRoute>
-                <Dashboard />
+                <Layout />
               </PrivateRoute>
             }
-          />
+          >
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/precargar" element={<Precargar />} />
+            <Route path="/historico" element={<Historico />} />
+          </Route>
 
-          <Route
-            path="/precargar"
-            element={
-              <PrivateRoute>
-                <Precargar />
-              </PrivateRoute>
-            }
-          />
-
-          <Route
-            path="/historico"
-            element={
-              <PrivateRoute>
-                <Historico />
-              </PrivateRoute>
-            }
-          />
-
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-          <Route path="*" element={<Navigate to="/dashboard" />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

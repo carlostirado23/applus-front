@@ -1,96 +1,79 @@
-import { createContext, useState, useContext, useEffect } from "react";
+import { createContext, useState, useContext, useEffect, useCallback, useMemo } from "react";
+import { apiFetch, UNAUTHORIZED_EVENT } from "../api/client";
 
 const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        const userData = localStorage.getItem("user");
-
-        if (token && userData) {
-            setUser(JSON.parse(userData));
-        }
-        setLoading(false);
-    }, []);
-
-    const API_URL = import.meta.env.VITE_API_URL;
-
-    const register = async (nombre, email, usuario, password) => {
-        try {
-            const response = await fetch(`${API_URL}/auth/register`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ nombre, email, usuario, password }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Error en el registro");
-            }
-
-            if (data.token) {
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(data.user));
-                setUser(data.user);
-            }
-
-            return { success: true, data };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    };
-
-    const login = async (usuario, password) => {
-        try {
-            const response = await fetch(`${API_URL}/auth/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ usuario, password }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Error en el login");
-            }
-
-            if (data.token) {
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(data.user));
-                setUser(data.user);
-            }
-
-            return { success: true, data };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    };
-
-    const logout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setUser(null);
-    };
-
-    const getToken = () => {
-        return localStorage.getItem("token");
-    };
-
-    return (
-        <AuthContext.Provider value={{ user, loading, register, login, logout, getToken }}>
-            {children}
-        </AuthContext.Provider>
-    );
+const clearSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
 };
 
+const readStoredUser = () => {
+    try {
+        const token = localStorage.getItem("token");
+        const userData = localStorage.getItem("user");
+        if (!token || !userData) return null;
+        return JSON.parse(userData) || null;
+    } catch {
+        // Datos corruptos en localStorage: se descarta la sesión.
+        clearSession();
+        return null;
+    }
+};
+
+export const AuthProvider = ({ children }) => {
+    // Lectura síncrona: evita el parpadeo de "cargando" al abrir la app.
+    const [user, setUser] = useState(readStoredUser);
+
+    const logout = useCallback(() => {
+        clearSession();
+        setUser(null);
+    }, []);
+
+    // Token expirado o inválido en cualquier petición: cerrar sesión.
+    useEffect(() => {
+        window.addEventListener(UNAUTHORIZED_EVENT, logout);
+        return () => window.removeEventListener(UNAUTHORIZED_EVENT, logout);
+    }, [logout]);
+
+    const authenticate = useCallback(async (path, payload, fallbackError) => {
+        try {
+            const data = await apiFetch(path, { method: "POST", auth: false, body: payload });
+
+            if (data?.token && data?.user) {
+                localStorage.setItem("token", data.token);
+                localStorage.setItem("user", JSON.stringify(data.user));
+                setUser(data.user);
+            }
+
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: error.message || fallbackError };
+        }
+    }, []);
+
+    const register = useCallback(
+        (nombre, email, usuario, password) =>
+            authenticate("/auth/register", { nombre, email, usuario, password }, "Error en el registro"),
+        [authenticate],
+    );
+
+    const login = useCallback(
+        (usuario, password) => authenticate("/auth/login", { usuario, password }, "Error en el login"),
+        [authenticate],
+    );
+
+    const getToken = useCallback(() => localStorage.getItem("token"), []);
+
+    const value = useMemo(
+        () => ({ user, loading: false, register, login, logout, getToken }),
+        [user, register, login, logout, getToken],
+    );
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {

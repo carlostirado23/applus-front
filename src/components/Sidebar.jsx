@@ -1,30 +1,39 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+
+const menuItems = [
+  { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  {
+    label: 'Programación',
+    icon: '📅',
+    submenu: [
+      { path: '/precargar', label: 'Precargar' },
+      { path: '/historico', label: 'Histórico' },
+    ],
+  },
+];
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
-  const location = useLocation();
-  const [isProgramacionOpen, setIsProgramacionOpen] = useState(false);
+  const { pathname } = useLocation();
+  // Arranca abierto si la ruta actual pertenece al submenú.
+  const [openMenus, setOpenMenus] = useState(() =>
+    Object.fromEntries(
+      menuItems
+        .filter((item) => item.submenu?.some((sub) => sub.path === pathname))
+        .map((item) => [item.label, true])
+    )
+  );
 
-  const isActive = (path) => location.pathname === path;
-
-  const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    {
-      label: 'Programación',
-      icon: '📅',
-      submenu: [
-        { path: '/precargar', label: 'Precargar' },
-        { path: '/historico', label: 'Histórico' },
-      ],
-    },
-  ];
+  const toggleMenu = (label) => setOpenMenus((prev) => ({ ...prev, [label]: !prev[label] }));
+  const closeSidebar = () => setIsOpen(false);
 
   return (
     <>
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={closeSidebar}
+          aria-hidden="true"
         ></div>
       )}
 
@@ -37,69 +46,72 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <div className="flex items-center justify-between p-6 border-b border-gray-800">
             <h1 className="text-xl font-bold">Admin System</h1>
             <button
-              onClick={() => setIsOpen(false)}
-              className="lg:hidden text-gray-400 hover:text-white"
+              type="button"
+              onClick={closeSidebar}
+              aria-label="Cerrar menú"
+              className="lg:hidden text-gray-400 hover:text-white cursor-pointer"
             >
               ✕
             </button>
           </div>
 
           <nav className="flex-1 overflow-y-auto py-4">
-            {menuItems.map((item, index) => (
-              <div key={index}>
-                {item.submenu ? (
-                  <div>
-                    <button
-                      onClick={() => setIsProgramacionOpen(!isProgramacionOpen)}
-                      className="w-full flex items-center justify-between px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="text-xl">{item.icon}</span>
-                        <span>{item.label}</span>
-                      </span>
-                      <span
-                        className={`transform transition-transform ${
-                          isProgramacionOpen ? 'rotate-180' : ''
-                        }`}
-                      >
-                        ▼
-                      </span>
-                    </button>
-                    {isProgramacionOpen && (
-                      <div className="bg-gray-800">
-                        {item.submenu.map((subItem, subIndex) => (
-                          <Link
-                            key={subIndex}
-                            to={subItem.path}
-                            onClick={() => setIsOpen(false)}
-                            className={`block px-6 py-3 pl-16 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors ${
-                              isActive(subItem.path)
-                                ? 'bg-gray-700 text-white border-l-4 border-blue-500'
-                                : ''
-                            }`}
-                          >
-                            {subItem.label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Link
-                    to={item.path}
-                    onClick={() => setIsOpen(false)}
-                    className={`flex items-center gap-3 px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors ${
-                      isActive(item.path)
-                        ? 'bg-gray-800 text-white border-l-4 border-blue-500'
-                        : ''
-                    }`}
+            {menuItems.map((item) =>
+              item.submenu ? (
+                <div key={item.label}>
+                  <button
+                    type="button"
+                    onClick={() => toggleMenu(item.label)}
+                    aria-expanded={!!openMenus[item.label]}
+                    className="w-full flex items-center justify-between px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors cursor-pointer"
                   >
-                    <span className="text-xl">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </Link>
-                )}
-              </div>
-            ))}
+                    <span className="flex items-center gap-3">
+                      <span className="text-xl">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </span>
+                    <span
+                      className={`transform transition-transform ${
+                        openMenus[item.label] ? 'rotate-180' : ''
+                      }`}
+                    >
+                      ▼
+                    </span>
+                  </button>
+                  {openMenus[item.label] && (
+                    <div className="bg-gray-800">
+                      {item.submenu.map((subItem) => (
+                        <NavLink
+                          key={subItem.path}
+                          to={subItem.path}
+                          onClick={closeSidebar}
+                          className={({ isActive }) =>
+                            `block px-6 py-3 pl-16 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors ${
+                              isActive ? 'bg-gray-700 text-white border-l-4 border-blue-500' : ''
+                            }`
+                          }
+                        >
+                          {subItem.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={closeSidebar}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-6 py-3 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors ${
+                      isActive ? 'bg-gray-800 text-white border-l-4 border-blue-500' : ''
+                    }`
+                  }
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  <span>{item.label}</span>
+                </NavLink>
+              )
+            )}
           </nav>
         </div>
       </aside>
