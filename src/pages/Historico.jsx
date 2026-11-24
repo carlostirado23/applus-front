@@ -1,96 +1,130 @@
-import { useState, useEffect, useMemo } from "react";
-import { InsertarBadge, ValidacionBadge } from "../components/Badges";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { apiDownload, query } from "../api/client";
+import Alerta from "../components/Alerta";
+import { EstadoEjecucionBadge, TecnicoBadge } from "../components/Badges";
+import DetalleOS from "../components/DetalleOS";
 import Icon from "../components/Icon";
+import Paginacion from "../components/Paginacion";
+import SelectTecnico from "../components/SelectTecnico";
+import { btn, input, label, spinner, tarjeta, td, th } from "../components/ui";
+import useMensaje from "../hooks/useMensaje";
 import {
+    ESTADOS_EJECUCION,
     fetchProgramaciones,
-    finDelDia,
     formatFecha,
     formatFechaHora,
-    inicioDelDia,
-    parseFecha,
-    tieneValidacion,
+    paramsProgramaciones,
 } from "../utils/programaciones";
 
-const COLUMNAS = [
-    "Número OS",
-    "Nombre",
-    "Municipio",
-    "Formulario",
-    "Creado Por",
-    "Asignado A",
-    "F. Est. Resol",
-    "Fecha de carga",
-    "Insertar",
-    "Validación",
+const COLUMNAS = ["Número OS", "Nombre", "Municipio", "Técnico", "F. Est. Resol", "Publicada", "Vista", "Estado", "Acciones"];
+
+const CAMPOS_FECHA = [
+    { value: "fecha_creacion", label: "Fecha de carga" },
+    { value: "fecha_publicacion", label: "Fecha de publicación" },
+    { value: "fecha_estimada_resolucion", label: "Fecha estimada" },
 ];
 
+const LIMITE = 25;
+
+const FILTROS_VACIOS = {
+    fechaInicio: "",
+    fechaFin: "",
+    campoFecha: "fecha_creacion",
+    tecnico_id: "",
+    municipio: "",
+    estado_ejecucion: "",
+    q: "",
+};
+
+/** Filtros iniciales: si vienen del dashboard (?tecnico_id&fecha) se preseleccionan. */
+const filtrosDesdeUrl = (params) => {
+    const tecnico_id = params.get("tecnico_id") || "";
+    const fecha = params.get("fecha") || "";
+    if (!tecnico_id && !fecha) return FILTROS_VACIOS;
+    return {
+        ...FILTROS_VACIOS,
+        tecnico_id,
+        fechaInicio: fecha,
+        fechaFin: fecha,
+        campoFecha: fecha ? "fecha_estimada_resolucion" : FILTROS_VACIOS.campoFecha,
+    };
+};
+
 const Historico = () => {
-    const [historico, setHistorico] = useState([]);
+    const [searchParams] = useSearchParams();
+    const [filtros, setFiltros] = useState(() => filtrosDesdeUrl(searchParams));
+    // Filtros ya consultados al servidor; la paginación usa estos, no lo que se está escribiendo.
+    const [filtrosAplicados, setFiltrosAplicados] = useState(filtros);
+    const [page, setPage] = useState(1);
+    const [resultado, setResultado] = useState({ data: [], total: 0, page: 1, limit: LIMITE, paginas: 1 });
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [fechaInicio, setFechaInicio] = useState("");
-    const [fechaFin, setFechaFin] = useState("");
-    // Rango ya consultado al servidor; el filtro local usa este, no lo que se está escribiendo.
-    const [rango, setRango] = useState({ fechaInicio: "", fechaFin: "" });
+    const [exportando, setExportando] = useState(false);
+    const [detalleId, setDetalleId] = useState(null);
+    const [huboCambios, setHuboCambios] = useState(false);
+    const { mensaje, mostrar } = useMensaje();
 
-    const rangoInvalido = Boolean(fechaInicio && fechaFin && fechaInicio > fechaFin);
+    const rangoInvalido = Boolean(filtros.fechaInicio && filtros.fechaFin && filtros.fechaInicio > filtros.fechaFin);
 
-    const cargarHistorico = async (filtros = {}) => {
+    const cargar = useCallback(async () => {
         setLoading(true);
-        setError("");
         try {
-            const lista = await fetchProgramaciones(filtros);
-            setHistorico(lista.filter((p) => tieneValidacion(p, "PUBLICADO")));
-            setRango({ fechaInicio: filtros.fechaInicio || "", fechaFin: filtros.fechaFin || "" });
+            setResultado(await fetchProgramaciones({ validacion: "PUBLICADO", ...filtrosAplicados, page, limit: LIMITE }));
         } catch (err) {
-            setError(err.message);
+            mostrar("error", `Error al cargar el histórico: ${err.message}`);
         } finally {
             setLoading(false);
         }
-    };
+    }, [filtrosAplicados, page, mostrar]);
 
     useEffect(() => {
-        cargarHistorico();
-    }, []);
+        cargar();
+    }, [cargar]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (rangoInvalido) return;
-        cargarHistorico({ fechaInicio, fechaFin });
+        setPage(1);
+        setFiltrosAplicados({ ...filtros });
     };
 
     const handleLimpiar = () => {
-        setSearchTerm("");
-        setFechaInicio("");
-        setFechaFin("");
-        cargarHistorico();
+        setFiltros(FILTROS_VACIOS);
+        setFiltrosAplicados(FILTROS_VACIOS);
+        setPage(1);
     };
 
-    const filteredHistorico = useMemo(() => {
-        const texto = searchTerm.trim().toLowerCase();
-        // El backend ya filtra por el rango exacto; este recorte local solo cubre datos ya cargados sin refrescar.
-        const desde = inicioDelDia(rango.fechaInicio);
-        const hasta = finDelDia(rango.fechaFin);
+    const handleExportar = async () => {
+        setExportando(true);
+        try {
+            const nombre = await apiDownload(
+                `/programaciones/exportar${query(paramsProgramaciones({ validacion: "PUBLICADO", ...filtrosAplicados }))}`,
+                "programaciones.xlsx",
+            );
+            mostrar("success", `Archivo ${nombre} descargado`);
+        } catch (err) {
+            mostrar("error", `Error al exportar: ${err.message}`);
+        } finally {
+            setExportando(false);
+        }
+    };
 
-        return historico.filter((item) => {
-            const matchTexto =
-                !texto ||
-                [item.numero_os, item.nombre, item.municipio, item.formulario, item.asignado_a, item.creado_por].some((campo) =>
-                    String(campo ?? "").toLowerCase().includes(texto),
-                );
-            if (!matchTexto) return false;
+    const cerrarDetalle = () => {
+        setDetalleId(null);
+        if (huboCambios) {
+            setHuboCambios(false);
+            cargar();
+        }
+    };
 
-            if (!desde && !hasta) return true;
-            const fecha = parseFecha(item.fecha_creacion);
-            if (!fecha) return false;
-            return (!desde || fecha >= desde) && (!hasta || fecha <= hasta);
-        });
-    }, [historico, searchTerm, rango]);
-
-    const hayFiltros = Boolean(searchTerm || rango.fechaInicio || rango.fechaFin);
-    const inputFecha =
-        "w-full px-4 py-2 font-medium text-gray-800 transition-all bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500";
+    const hayFiltros = Object.keys(FILTROS_VACIOS).some((k) => filtrosAplicados[k] !== FILTROS_VACIOS[k]);
+    const campo = (name) => ({
+        id: name,
+        name,
+        value: filtros[name],
+        onChange: (e) => setFiltros((f) => ({ ...f, [name]: e.target.value })),
+        className: input,
+    });
 
     return (
         <>
@@ -99,68 +133,74 @@ const Historico = () => {
                 <p className="text-gray-600">Consulta todas las programaciones publicadas</p>
             </div>
 
-            {error && (
-                <div className="p-4 mb-4 text-sm text-red-700 border border-red-200 rounded-lg bg-red-50" role="alert">
-                    Error al cargar el histórico: {error}
-                </div>
-            )}
+            <Alerta mensaje={mensaje} />
 
-            <div className="p-4 mb-6 bg-white shadow-md rounded-xl sm:p-6">
-                <form className="flex flex-col w-full gap-2 sm:flex-row sm:items-end" onSubmit={handleSubmit}>
-                    <div className="flex flex-col items-start w-full sm:w-1/4">
-                        <label htmlFor="fechaInicio" className="mb-1 text-xs font-semibold text-gray-700">
-                            Cargado desde
-                        </label>
-                        <input
-                            id="fechaInicio"
-                            type="date"
-                            value={fechaInicio}
-                            max={fechaFin || undefined}
-                            onChange={(e) => setFechaInicio(e.target.value)}
-                            className={inputFecha}
+            <div className={`${tarjeta} mb-6`}>
+                <form className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={handleSubmit}>
+                    <div>
+                        <label htmlFor="campoFecha" className={label}>Filtrar fecha por</label>
+                        <select {...campo("campoFecha")}>
+                            {CAMPOS_FECHA.map((c) => (
+                                <option key={c.value} value={c.value}>
+                                    {c.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="fechaInicio" className={label}>Desde</label>
+                        <input type="date" max={filtros.fechaFin || undefined} {...campo("fechaInicio")} />
+                    </div>
+                    <div>
+                        <label htmlFor="fechaFin" className={label}>Hasta</label>
+                        <input type="date" min={filtros.fechaInicio || undefined} {...campo("fechaFin")} />
+                    </div>
+                    <div>
+                        <label htmlFor="tecnico_id" className={label}>Técnico</label>
+                        <SelectTecnico
+                            id="tecnico_id"
+                            value={filtros.tecnico_id}
+                            onChange={(v) => setFiltros((f) => ({ ...f, tecnico_id: v }))}
+                            opcionTodos
                         />
                     </div>
-                    <span className="hidden mx-2 mb-2 font-bold text-gray-500 sm:inline-block">a</span>
-                    <div className="flex flex-col items-start w-full sm:w-1/4">
-                        <label htmlFor="fechaFin" className="mb-1 text-xs font-semibold text-gray-700">
-                            Cargado hasta
-                        </label>
-                        <input
-                            id="fechaFin"
-                            type="date"
-                            value={fechaFin}
-                            min={fechaInicio || undefined}
-                            onChange={(e) => setFechaFin(e.target.value)}
-                            className={inputFecha}
-                        />
+                    <div>
+                        <label htmlFor="municipio" className={label}>Municipio</label>
+                        <input type="text" placeholder="Ej: Montería" {...campo("municipio")} />
                     </div>
-                    <div className="flex flex-col items-start w-full sm:w-2/5 sm:ml-4">
-                        <label htmlFor="searchTerm" className="mb-1 text-xs font-semibold text-gray-700">
-                            Buscar
-                        </label>
-                        <input
-                            id="searchTerm"
-                            type="search"
-                            placeholder="Buscar por OS, nombre, municipio, formulario, creador o asignado..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-                        />
+                    <div>
+                        <label htmlFor="estado_ejecucion" className={label}>Estado de ejecución</label>
+                        <select {...campo("estado_ejecucion")}>
+                            <option value="">Todos</option>
+                            {Object.entries(ESTADOS_EJECUCION).map(([k, v]) => (
+                                <option key={k} value={k}>
+                                    {v}
+                                </option>
+                            ))}
+                        </select>
                     </div>
-                    <button
-                        type="submit"
-                        disabled={loading || rangoInvalido}
-                        className="flex items-center justify-center w-full px-6 py-2 mt-2 font-semibold text-white transition-colors bg-brand-600 rounded-lg cursor-pointer sm:w-auto hover:bg-brand-700 sm:mt-0 sm:ml-4 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <Icon name="search" className="w-4 h-4 mr-2" /> Buscar
-                    </button>
-                    {hayFiltros && (
+                    <div className="sm:col-span-2">
+                        <label htmlFor="q" className={label}>Buscar</label>
+                        <input type="search" placeholder="OS, NIC, nombre, dirección, técnico..." {...campo("q")} />
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4">
+                        <button type="submit" disabled={loading || rangoInvalido} className={btn.primario}>
+                            <Icon name="search" className="w-4 h-4" /> Buscar
+                        </button>
+                        {hayFiltros && (
+                            <button type="button" onClick={handleLimpiar} disabled={loading} className={btn.secundario}>
+                                Limpiar
+                            </button>
+                        )}
                         <button
                             type="button"
-                            onClick={handleLimpiar}
-                            className="w-full px-4 py-2 mt-2 font-semibold text-gray-700 transition-colors bg-gray-200 rounded-lg cursor-pointer sm:w-auto hover:bg-gray-300 sm:mt-0">
-                            Limpiar
+                            onClick={handleExportar}
+                            disabled={exportando || loading || resultado.total === 0}
+                            className={`${btn.secundario} sm:ml-auto`}>
+                            <Icon name="download" className="w-4 h-4" />
+                            {exportando ? "Exportando..." : "Exportar Excel"}
                         </button>
-                    )}
+                    </div>
                 </form>
                 {rangoInvalido && (
                     <p className="mt-2 text-sm text-red-600">La fecha inicial no puede ser mayor que la fecha final.</p>
@@ -170,78 +210,87 @@ const Historico = () => {
             <div className="overflow-hidden bg-white shadow-md rounded-xl">
                 {loading ? (
                     <div className="flex items-center justify-center py-12">
-                        <div className="w-10 h-10 border-4 border-brand-100 border-t-brand-500 rounded-full animate-spin"></div>
+                        <div className={spinner}></div>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    {COLUMNAS.map((columna) => (
-                                        <th
-                                            key={columna}
-                                            className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                                            {columna}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredHistorico.length === 0 ? (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
                                     <tr>
-                                        <td colSpan={COLUMNAS.length} className="px-4 py-8 text-center text-gray-500">
-                                            {hayFiltros
-                                                ? "No se encontraron resultados para tu búsqueda."
-                                                : "No hay programaciones publicadas aún."}
-                                        </td>
+                                        {COLUMNAS.map((columna) => (
+                                            <th key={columna} className={th}>
+                                                {columna}
+                                            </th>
+                                        ))}
                                     </tr>
-                                ) : (
-                                    filteredHistorico.map((item) => (
-                                        <tr key={item.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                                                {item.numero_os}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                {item.nombre || "—"}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                {item.municipio || "—"}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                {item.formulario}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                {item.creado_por}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                {item.asignado_a}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                {formatFecha(item.fecha_estimada_resolucion)}
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                {formatFechaHora(item.fecha_creacion)}
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <InsertarBadge value={item.insertar} />
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <ValidacionBadge value={item.validacion} />
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {resultado.data.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={COLUMNAS.length} className="px-4 py-8 text-center text-gray-500">
+                                                {hayFiltros
+                                                    ? "No se encontraron resultados para tu búsqueda."
+                                                    : "No hay programaciones publicadas aún."}
                                             </td>
                                         </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    ) : (
+                                        resultado.data.map((item) => (
+                                            <tr key={item.id} className="hover:bg-gray-50">
+                                                <td className={`${td} font-medium text-gray-900`}>{item.numero_os}</td>
+                                                <td className={td}>{item.nombre || "—"}</td>
+                                                <td className={td}>{item.municipio || "—"}</td>
+                                                <td className={td}>
+                                                    <TecnicoBadge programacion={item} />
+                                                </td>
+                                                <td className={td}>{formatFecha(item.fecha_estimada_resolucion)}</td>
+                                                <td className={td}>{formatFechaHora(item.fecha_publicacion)}</td>
+                                                <td className={td}>
+                                                    {item.fecha_vista ? (
+                                                        <span
+                                                            className="inline-flex text-green-600"
+                                                            title={`Vista el ${formatFechaHora(item.fecha_vista)}`}
+                                                            aria-label="Vista por el técnico">
+                                                            <Icon name="check" className="w-5 h-5" />
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400" title="El técnico aún no la ha visto">
+                                                            —
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className={td}>
+                                                    <EstadoEjecucionBadge value={item.estado_ejecucion} />
+                                                </td>
+                                                <td className={td}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setDetalleId(item.id)}
+                                                        title="Ver detalle"
+                                                        aria-label={`Ver detalle de OS ${item.numero_os}`}
+                                                        className={btn.icono}>
+                                                        <Icon name="eye" className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <Paginacion
+                            page={resultado.page}
+                            paginas={resultado.paginas}
+                            total={resultado.total}
+                            limit={resultado.limit}
+                            onChange={setPage}
+                            disabled={loading}
+                        />
+                    </>
                 )}
             </div>
 
-            {!loading && filteredHistorico.length > 0 && (
-                <div className="mt-4 text-sm text-center text-gray-600">
-                    Mostrando {filteredHistorico.length} de {historico.length} programaciones
-                </div>
-            )}
+            <DetalleOS id={detalleId} open={detalleId !== null} onClose={cerrarDetalle} onChange={() => setHuboCambios(true)} />
         </>
     );
 };

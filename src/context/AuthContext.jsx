@@ -3,6 +3,10 @@ import { apiFetch, UNAUTHORIZED_EVENT } from "../api/client";
 
 const AuthContext = createContext(null);
 
+// Roles que pueden entrar al panel administrativo. TECNICO usa la app móvil.
+// eslint-disable-next-line react-refresh/only-export-components
+export const ROLES_PANEL = ["ADMIN", "SUPERVISOR"];
+
 const clearSession = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -13,7 +17,13 @@ const readStoredUser = () => {
         const token = localStorage.getItem("token");
         const userData = localStorage.getItem("user");
         if (!token || !userData) return null;
-        return JSON.parse(userData) || null;
+        const user = JSON.parse(userData) || null;
+        // Sesiones guardadas antes de existir roles: se cierran para obtener el rol al volver a entrar.
+        if (!user?.rol || !ROLES_PANEL.includes(user.rol)) {
+            clearSession();
+            return null;
+        }
+        return user;
     } catch {
         // Datos corruptos en localStorage: se descarta la sesión.
         clearSession();
@@ -36,38 +46,62 @@ export const AuthProvider = ({ children }) => {
         return () => window.removeEventListener(UNAUTHORIZED_EVENT, logout);
     }, [logout]);
 
-    const authenticate = useCallback(async (path, payload, fallbackError) => {
-        try {
-            const data = await apiFetch(path, { method: "POST", auth: false, body: payload });
-
-            if (data?.token && data?.user) {
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(data.user));
-                setUser(data.user);
-            }
-
-            return { success: true, data };
-        } catch (error) {
-            return { success: false, error: error.message || fallbackError };
-        }
+    const guardarSesion = useCallback((data) => {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setUser(data.user);
     }, []);
 
-    const register = useCallback(
-        (nombre, email, usuario, password) =>
-            authenticate("/auth/register", { nombre, email, usuario, password }, "Error en el registro"),
-        [authenticate],
-    );
-
     const login = useCallback(
-        (usuario, password) => authenticate("/auth/login", { usuario, password }, "Error en el login"),
-        [authenticate],
+        async (usuario, password) => {
+            try {
+                const data = await apiFetch("/auth/login", { method: "POST", auth: false, body: { usuario, password } });
+                if (!data?.token || !data?.user) throw new Error("Respuesta inválida del servidor");
+                if (!ROLES_PANEL.includes(data.user.rol)) {
+                    return { success: false, error: "Tu usuario es de técnico. Usa la aplicación móvil para ver tus órdenes." };
+                }
+                guardarSesion(data);
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message || "Error en el login" };
+            }
+        },
+        [guardarSesion],
     );
 
-    const getToken = useCallback(() => localStorage.getItem("token"), []);
+    // Solo sirve para crear el primer administrador (el backend cierra el registro después).
+    const register = useCallback(
+        async (nombre, email, usuario, password) => {
+            try {
+                const data = await apiFetch("/auth/register", { method: "POST", auth: false, body: { nombre, email, usuario, password } });
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message || "Error en el registro" };
+            }
+        },
+        [],
+    );
+
+    /** Actualiza los datos del usuario en sesión (p. ej. tras editar el perfil). */
+    const actualizarUsuario = useCallback((cambios) => {
+        setUser((prev) => {
+            const nuevo = { ...prev, ...cambios };
+            localStorage.setItem("user", JSON.stringify(nuevo));
+            return nuevo;
+        });
+    }, []);
 
     const value = useMemo(
-        () => ({ user, loading: false, register, login, logout, getToken }),
-        [user, register, login, logout, getToken],
+        () => ({
+            user,
+            rol: user?.rol ?? null,
+            esAdmin: user?.rol === "ADMIN",
+            login,
+            register,
+            logout,
+            actualizarUsuario,
+        }),
+        [user, login, register, logout, actualizarUsuario],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

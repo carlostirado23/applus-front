@@ -56,10 +56,13 @@ const Login = () => {
       subtitle="Inicia sesión para gestionar las programaciones."
       footer={
         <>
-          ¿No tienes cuenta?{' '}
-          <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700 hover:underline">
-            Regístrate aquí
-          </Link>
+          ¿No tienes usuario? Pídelo al administrador del sistema.
+          <span className="block mt-1 text-xs text-gray-400">
+            Primera instalación:{' '}
+            <Link to="/register" className="text-brand-600 hover:underline">
+              crear el administrador
+            </Link>
+          </span>
         </>
       }
     >

@@ -1,76 +1,100 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { apiFetch } from "../api/client";
-import { InsertarBadge, ValidacionBadge } from "../components/Badges";
+import Alerta from "../components/Alerta";
+import { InsertarBadge, TecnicoBadge, ValidacionBadge } from "../components/Badges";
+import Confirmar from "../components/Confirmar";
+import DetalleOS from "../components/DetalleOS";
 import Icon from "../components/Icon";
-import { esInsertar, fetchProgramaciones, formatFecha, tieneValidacion } from "../utils/programaciones";
+import SelectTecnico from "../components/SelectTecnico";
+import { btn, input, label, spinner, tarjeta, td, th } from "../components/ui";
+import useMensaje from "../hooks/useMensaje";
+import {
+    descargarDataUrl,
+    esInsertar,
+    esPublicable,
+    fetchProgramaciones,
+    formatFecha,
+    formatFechaHora,
+    validarExcel,
+} from "../utils/programaciones";
 
-const MAX_EXCEL_BYTES = 10 * 1024 * 1024; // límite del backend
 const COLUMNAS = [
     "Número OS",
     "Nombre",
     "Municipio",
-    "Formulario",
-    "Creado Por",
+    "Técnico",
     "Asignado A",
     "F. Est. Resol",
+    "Cargada",
     "Insertar",
     "Validación",
+    "Acciones",
 ];
 
-// Solo se publican las OS nuevas (insertar = true). Las duplicadas quedan como histórico; el backend también las rechaza.
-const esPublicable = (prog) => esInsertar(prog.insertar);
+const FILTROS_VACIOS = { fechaInicio: "", fechaFin: "", tecnico_id: "", q: "" };
+
+/** Texto de las omitidas del backend: hasta 5 "OS X: motivo". */
+const resumenOmitidas = (omitidas = []) => {
+    if (!omitidas.length) return "";
+    const lineas = omitidas.slice(0, 5).map((o) => `OS ${o.numero_os ?? o.id}: ${o.motivo}`);
+    const resto = omitidas.length > 5 ? ` y ${omitidas.length - 5} más` : "";
+    return ` — ${lineas.join("; ")}${resto}`;
+};
 
 const Precargar = () => {
     const [programaciones, setProgramaciones] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
     const [loadingList, setLoadingList] = useState(true);
-    const [busy, setBusy] = useState(""); // "", "plantilla", "excel", "publicar"
-    const [message, setMessage] = useState({ type: "", text: "" });
-    const messageTimer = useRef(null);
+    const [busy, setBusy] = useState(""); // "", "plantilla", "excel", "publicar", "eliminar"
+    const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+    const [filtrosAplicados, setFiltrosAplicados] = useState(FILTROS_VACIOS);
+    const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+    const [detalleId, setDetalleId] = useState(null);
+    const [detalleModo, setDetalleModo] = useState("");
+    const [huboCambios, setHuboCambios] = useState(false);
+    const { mensaje, mostrar } = useMensaje();
 
-    // Un solo temporizador: un mensaje nuevo no es borrado por el timeout del anterior.
-    const showMessage = useCallback((type, text) => {
-        clearTimeout(messageTimer.current);
-        setMessage({ type, text });
-        messageTimer.current = setTimeout(() => setMessage({ type: "", text: "" }), type === "success" ? 3000 : 6000);
-    }, []);
+    const rangoInvalido = Boolean(filtros.fechaInicio && filtros.fechaFin && filtros.fechaInicio > filtros.fechaFin);
 
-    useEffect(() => () => clearTimeout(messageTimer.current), []);
-
-    const cargarProgramaciones = useCallback(async () => {
-        try {
-            const lista = await fetchProgramaciones();
-            const pendientes = lista.filter((p) => tieneValidacion(p, "PENDIENTE"));
-            setProgramaciones(pendientes);
-            // Descartar selecciones que ya no existen o ya no se pueden publicar.
-            setSelectedIds((prev) => prev.filter((id) => pendientes.some((p) => p.id === id && esPublicable(p))));
-        } catch (error) {
-            showMessage("error", `Error al cargar programaciones: ${error.message}`);
-        } finally {
-            setLoadingList(false);
-        }
-    }, [showMessage]);
+    const cargarProgramaciones = useCallback(
+        async (f = filtrosAplicados) => {
+            setLoadingList(true);
+            try {
+                const lista = await fetchProgramaciones({ validacion: "PENDIENTE", ...f });
+                setProgramaciones(lista);
+                // Descartar selecciones que ya no están en la lista.
+                setSelectedIds((prev) => prev.filter((id) => lista.some((p) => p.id === id)));
+            } catch (error) {
+                mostrar("error", `Error al cargar programaciones: ${error.message}`);
+            } finally {
+                setLoadingList(false);
+            }
+        },
+        [filtrosAplicados, mostrar],
+    );
 
     useEffect(() => {
         cargarProgramaciones();
     }, [cargarProgramaciones]);
 
+    const handleBuscar = (e) => {
+        e.preventDefault();
+        if (rangoInvalido) return;
+        setFiltrosAplicados({ ...filtros });
+    };
+
+    const handleLimpiar = () => {
+        setFiltros(FILTROS_VACIOS);
+        setFiltrosAplicados(FILTROS_VACIOS);
+    };
+
     const handleDescargarPlantilla = async () => {
         setBusy("plantilla");
         try {
-            const data = await apiFetch("/programaciones/descargar-plantilla");
-            if (!data?.dataUrl) throw new Error("No se recibió el archivo");
-
-            const a = document.createElement("a");
-            a.href = data.dataUrl;
-            a.download = data.fileName || "plantilla_programaciones.xlsx";
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-
-            showMessage("success", "Plantilla descargada correctamente");
+            descargarDataUrl(await apiFetch("/programaciones/descargar-plantilla"), "plantilla_programaciones.xlsx");
+            mostrar("success", "Plantilla descargada correctamente");
         } catch (error) {
-            showMessage("error", `Error al descargar plantilla: ${error.message}`);
+            mostrar("error", `Error al descargar plantilla: ${error.message}`);
         } finally {
             setBusy("");
         }
@@ -81,14 +105,9 @@ const Precargar = () => {
         const file = input.files[0];
         if (!file) return;
 
-        // Mismas reglas que el backend: solo .xlsx, máximo 10 MB.
-        if (!/\.xlsx$/i.test(file.name)) {
-            showMessage("error", "Solo se aceptan archivos .xlsx");
-            input.value = "";
-            return;
-        }
-        if (file.size > MAX_EXCEL_BYTES) {
-            showMessage("error", "El archivo supera el tamaño máximo permitido (10 MB)");
+        const invalido = validarExcel(file);
+        if (invalido) {
+            mostrar("error", invalido);
             input.value = "";
             return;
         }
@@ -99,14 +118,13 @@ const Precargar = () => {
 
         try {
             const data = await apiFetch("/programaciones/cargar-excel", { method: "POST", body: formData });
-            const resumen =
-                data?.total != null
-                    ? `: ${data.total} filas (${data.nuevas} nuevas, ${data.duplicados} duplicadas)`
-                    : "";
-            showMessage(data?.duplicados ? "warning" : "success", `Excel cargado correctamente${resumen}`);
+            const partes = [`${data.total} filas`, `${data.nuevas} nuevas`];
+            if (data.duplicados) partes.push(`${data.duplicados} duplicadas`);
+            if (data.sin_tecnico) partes.push(`${data.sin_tecnico} sin técnico`);
+            mostrar(data.duplicados || data.sin_tecnico ? "warning" : "success", `Excel cargado: ${partes.join(", ")}`);
             await cargarProgramaciones();
         } catch (error) {
-            showMessage("error", `Error al cargar Excel: ${error.message}`);
+            mostrar("error", `Error al cargar Excel: ${error.message}`);
         } finally {
             setBusy("");
             input.value = ""; // permite volver a elegir el mismo archivo
@@ -114,11 +132,21 @@ const Precargar = () => {
     };
 
     const publicables = useMemo(() => programaciones.filter(esPublicable), [programaciones]);
-    const duplicadas = programaciones.length - publicables.length;
-    const allSelected = publicables.length > 0 && selectedIds.length === publicables.length;
+    const duplicadas = useMemo(() => programaciones.filter((p) => !esInsertar(p.insertar)).length, [programaciones]);
+    const sinTecnico = useMemo(() => programaciones.filter((p) => esInsertar(p.insertar) && !p.tecnico_id).length, [programaciones]);
+    const seleccionPublicable = useMemo(
+        () => selectedIds.filter((id) => publicables.some((p) => p.id === id)),
+        [selectedIds, publicables],
+    );
+    const todasPublicablesSeleccionadas = publicables.length > 0 && publicables.every((p) => selectedIds.includes(p.id));
 
+    // "Seleccionar todos" solo marca las publicables; si ya están todas, las quita (deja el resto como estaba).
     const handleSelectAll = () => {
-        setSelectedIds(allSelected ? [] : publicables.map((p) => p.id));
+        setSelectedIds((prev) =>
+            todasPublicablesSeleccionadas
+                ? prev.filter((id) => !publicables.some((p) => p.id === id))
+                : [...new Set([...prev, ...publicables.map((p) => p.id)])],
+        );
     };
 
     const handleSelectOne = (id) => {
@@ -126,31 +154,58 @@ const Precargar = () => {
     };
 
     const handlePublicar = async () => {
-        if (selectedIds.length === 0) {
-            showMessage("error", "Seleccione al menos una programación");
+        if (seleccionPublicable.length === 0) {
+            mostrar("error", "Ninguna de las seleccionadas se puede publicar (duplicada o sin técnico)");
             return;
         }
-
         setBusy("publicar");
         try {
-            const data = await apiFetch("/programaciones/publicar", { method: "POST", body: { ids: selectedIds } });
-            const omitidas = data?.omitidas?.length ?? 0;
-            showMessage(
-                omitidas ? "warning" : "success",
-                data?.message || `Programaciones publicadas correctamente (${data?.total ?? selectedIds.length})`,
-            );
+            const data = await apiFetch("/programaciones/publicar", { method: "POST", body: { ids: seleccionPublicable } });
+            const omitidas = data?.omitidas ?? [];
+            const noEnviadas = selectedIds.length - seleccionPublicable.length;
+            const extra = noEnviadas > 0 ? ` (${noEnviadas} seleccionada${noEnviadas === 1 ? "" : "s"} no publicable${noEnviadas === 1 ? "" : "s"} no se envió)` : "";
+            mostrar(omitidas.length || noEnviadas ? "warning" : "success", `${data?.message || "Programaciones publicadas"}${extra}${resumenOmitidas(omitidas)}`);
             setSelectedIds([]);
             await cargarProgramaciones();
         } catch (error) {
-            showMessage("error", `Error al publicar programaciones: ${error.message}`);
+            mostrar("error", `${error.message}${resumenOmitidas(error.detalles)}`);
         } finally {
             setBusy("");
         }
     };
 
+    const handleEliminar = async () => {
+        setBusy("eliminar");
+        try {
+            const data = await apiFetch("/programaciones/eliminar", { method: "POST", body: { ids: selectedIds } });
+            const omitidas = data?.omitidas ?? [];
+            mostrar(omitidas.length ? "warning" : "success", `${data?.message || "Programaciones eliminadas"}${resumenOmitidas(omitidas)}`);
+            setSelectedIds([]);
+            setConfirmarEliminar(false);
+            await cargarProgramaciones();
+        } catch (error) {
+            mostrar("error", `Error al eliminar: ${error.message}${resumenOmitidas(error.detalles)}`);
+        } finally {
+            setBusy("");
+        }
+    };
+
+    const cerrarDetalle = () => {
+        setDetalleId(null);
+        setDetalleModo("");
+        if (huboCambios) {
+            setHuboCambios(false);
+            cargarProgramaciones();
+        }
+    };
+
     const isBusy = busy !== "";
-    const boton =
-        "flex flex-1 items-center justify-center gap-2 px-5 py-2.5 font-semibold text-white transition-colors rounded-lg cursor-pointer sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed";
+    const campoFiltro = (name) => ({
+        name,
+        value: filtros[name],
+        onChange: (e) => setFiltros((f) => ({ ...f, [name]: e.target.value })),
+        className: input,
+    });
 
     return (
         <>
@@ -159,69 +214,89 @@ const Precargar = () => {
                 <p className="text-gray-600">Carga y gestiona programaciones antes de publicar</p>
             </div>
 
-            {message.text && (
-                <div
-                    role={message.type === "error" ? "alert" : "status"}
-                    className={`mb-4 p-4 rounded-lg ${
-                        message.type === "success"
-                            ? "bg-green-50 border border-green-200 text-green-700"
-                            : message.type === "warning"
-                              ? "bg-yellow-50 border border-yellow-200 text-yellow-800"
-                              : "bg-red-50 border border-red-200 text-red-700"
-                    }`}>
-                    {message.text}
-                </div>
-            )}
+            <Alerta mensaje={mensaje} />
 
-            <div className="p-4 mb-6 bg-white shadow-md rounded-xl sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
-                    <button
-                        type="button"
-                        onClick={handleDescargarPlantilla}
-                        disabled={isBusy}
-                        className={`${boton} bg-white text-gray-700! border border-gray-300 hover:bg-gray-50 hover:border-gray-400`}>
+            <div className={`${tarjeta} mb-6`}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <button type="button" onClick={handleDescargarPlantilla} disabled={isBusy} className={btn.secundario}>
                         <Icon name="download" className="w-4 h-4" />
                         {busy === "plantilla" ? "Descargando..." : "Descargar Plantilla"}
                     </button>
 
-                    <label
-                        className={`flex flex-1 items-center justify-center gap-2 px-5 py-2.5 font-semibold text-white transition-colors bg-gray-800 rounded-lg sm:flex-none focus-within:ring-2 focus-within:ring-brand-500/50 ${
-                            isBusy ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-gray-900"
-                        }`}>
+                    <label className={`${btn.oscuro} focus-within:ring-2 focus-within:ring-brand-500/50 ${isBusy ? "opacity-50 cursor-not-allowed" : ""}`}>
                         <Icon name="upload" className="w-4 h-4" />
                         {busy === "excel" ? "Cargando..." : "Cargar Excel"}
-                        <input
-                            type="file"
-                            accept=".xlsx"
-                            onChange={handleCargarExcel}
-                            disabled={isBusy}
-                            className="sr-only"
-                        />
+                        <input type="file" accept=".xlsx" onChange={handleCargarExcel} disabled={isBusy} className="sr-only" />
                     </label>
 
-                    <button
-                        type="button"
-                        onClick={handleSelectAll}
-                        disabled={publicables.length === 0 || isBusy}
-                        className={`${boton} bg-white text-gray-700! border border-gray-300 hover:bg-gray-50 hover:border-gray-400`}>
+                    <button type="button" onClick={handleSelectAll} disabled={publicables.length === 0 || isBusy} className={btn.secundario}>
                         <Icon name="checkSquare" className="w-4 h-4" />
-                        {allSelected ? "Deseleccionar Todos" : "Seleccionar Todos"}
+                        {todasPublicablesSeleccionadas ? "Deseleccionar publicables" : "Seleccionar publicables"}
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={handlePublicar}
-                        disabled={selectedIds.length === 0 || isBusy}
-                        className={`${boton} bg-brand-600 hover:bg-brand-700 shadow-md shadow-brand-600/30 disabled:shadow-none sm:ml-auto`}>
-                        <Icon name="send" className="w-4 h-4" />
-                        {busy === "publicar" ? "Publicando..." : `Publicar (${selectedIds.length})`}
-                    </button>
+                    <div className="flex gap-3 sm:ml-auto">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmarEliminar(true)}
+                            disabled={selectedIds.length === 0 || isBusy}
+                            className={`${btn.secundario} text-red-600! border-red-200 hover:bg-red-50`}>
+                            <Icon name="trash" className="w-4 h-4" />
+                            Eliminar ({selectedIds.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handlePublicar}
+                            disabled={seleccionPublicable.length === 0 || isBusy}
+                            title={selectedIds.length && !seleccionPublicable.length ? "Ninguna de las seleccionadas se puede publicar" : undefined}
+                            className={btn.primario}>
+                            <Icon name="send" className="w-4 h-4" />
+                            {busy === "publicar" ? "Publicando..." : `Publicar (${seleccionPublicable.length})`}
+                        </button>
+                    </div>
                 </div>
-                {duplicadas > 0 && (
+
+                <form className="grid grid-cols-1 gap-3 pt-4 mt-4 border-t border-gray-200 sm:grid-cols-2 lg:grid-cols-5" onSubmit={handleBuscar}>
+                    <div>
+                        <label htmlFor="fechaInicio" className={label}>Cargada desde</label>
+                        <input id="fechaInicio" type="date" max={filtros.fechaFin || undefined} {...campoFiltro("fechaInicio")} />
+                    </div>
+                    <div>
+                        <label htmlFor="fechaFin" className={label}>Cargada hasta</label>
+                        <input id="fechaFin" type="date" min={filtros.fechaInicio || undefined} {...campoFiltro("fechaFin")} />
+                    </div>
+                    <div>
+                        <label htmlFor="tecnico" className={label}>Técnico</label>
+                        <SelectTecnico
+                            id="tecnico"
+                            value={filtros.tecnico_id}
+                            onChange={(v) => setFiltros((f) => ({ ...f, tecnico_id: v }))}
+                            opcionTodos
+                            opcionSin
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="q" className={label}>Buscar</label>
+                        <input id="q" type="search" placeholder="OS, NIC, nombre, dirección..." {...campoFiltro("q")} />
+                    </div>
+                    <div className="flex items-end gap-2">
+                        <button type="submit" disabled={loadingList || rangoInvalido} className={`${btn.primario} flex-1`}>
+                            <Icon name="search" className="w-4 h-4" /> Buscar
+                        </button>
+                        <button type="button" onClick={handleLimpiar} disabled={loadingList} className={btn.secundario}>
+                            Limpiar
+                        </button>
+                    </div>
+                </form>
+                {rangoInvalido && <p className="mt-2 text-sm text-red-600">La fecha inicial no puede ser mayor que la fecha final.</p>}
+
+                {(duplicadas > 0 || sinTecnico > 0) && (
                     <p className="flex items-start gap-2 mt-3 text-sm text-yellow-800">
                         <Icon name="alert" className="w-4 h-4 mt-0.5" />
-                        {duplicadas} OS duplicada{duplicadas === 1 ? "" : "s"} en la lista: quedan como histórico y no se
-                        pueden publicar.
+                        <span>
+                            {duplicadas > 0 && `${duplicadas} duplicada${duplicadas === 1 ? "" : "s"} (histórico, no se publican)`}
+                            {duplicadas > 0 && sinTecnico > 0 && " · "}
+                            {sinTecnico > 0 && `${sinTecnico} sin técnico (asígnalo para poder publicar)`}
+                        </span>
                     </p>
                 )}
             </div>
@@ -229,7 +304,7 @@ const Precargar = () => {
             <div className="overflow-hidden bg-white shadow-md rounded-xl">
                 {loadingList ? (
                     <div className="flex items-center justify-center py-12">
-                        <div className="w-10 h-10 border-4 border-brand-100 border-t-brand-500 rounded-full animate-spin"></div>
+                        <div className={spinner}></div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -240,16 +315,14 @@ const Precargar = () => {
                                         <input
                                             type="checkbox"
                                             aria-label="Seleccionar todas las publicables"
-                                            checked={allSelected}
+                                            checked={todasPublicablesSeleccionadas}
                                             disabled={publicables.length === 0}
                                             onChange={handleSelectAll}
                                             className="w-4 h-4 cursor-pointer accent-brand-600"
                                         />
                                     </th>
                                     {COLUMNAS.map((columna) => (
-                                        <th
-                                            key={columna}
-                                            className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                                        <th key={columna} className={th}>
                                             {columna}
                                         </th>
                                     ))}
@@ -258,54 +331,74 @@ const Precargar = () => {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {programaciones.length === 0 ? (
                                     <tr>
-                                        <td
-                                            colSpan={COLUMNAS.length + 1}
-                                            className="px-4 py-8 text-center text-gray-500">
-                                            No hay programaciones precargadas. Carga un archivo Excel para comenzar.
+                                        <td colSpan={COLUMNAS.length + 1} className="px-4 py-8 text-center text-gray-500">
+                                            {filtrosAplicados !== FILTROS_VACIOS && Object.values(filtrosAplicados).some(Boolean)
+                                                ? "No hay programaciones pendientes con esos filtros."
+                                                : "No hay programaciones precargadas. Carga un archivo Excel para comenzar."}
                                         </td>
                                     </tr>
                                 ) : (
                                     programaciones.map((prog) => {
+                                        const duplicada = !esInsertar(prog.insertar);
+                                        const faltaTecnico = !duplicada && !prog.tecnico_id;
                                         const publicable = esPublicable(prog);
+                                        const fondo = duplicada ? "bg-red-50/50" : faltaTecnico ? "bg-amber-50/60" : "hover:bg-gray-50";
+                                        const motivo = duplicada
+                                            ? "OS duplicada: no se puede publicar (sí se puede eliminar)"
+                                            : faltaTecnico
+                                              ? "Sin técnico asignado: asígnalo para poder publicar (sí se puede eliminar)"
+                                              : undefined;
                                         return (
-                                            <tr key={prog.id} className={publicable ? "hover:bg-gray-50" : "bg-red-50/40"}>
-                                                <td className="px-4 py-4 whitespace-nowrap">
+                                            <tr key={prog.id} className={fondo}>
+                                                <td className="px-4 py-3 whitespace-nowrap">
                                                     <input
                                                         type="checkbox"
                                                         aria-label={`Seleccionar OS ${prog.numero_os}`}
-                                                        title={publicable ? undefined : "OS duplicada: no se puede publicar"}
+                                                        title={motivo}
                                                         checked={selectedIds.includes(prog.id)}
-                                                        disabled={!publicable}
                                                         onChange={() => handleSelectOne(prog.id)}
-                                                        className="w-4 h-4 cursor-pointer accent-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                        className={`w-4 h-4 cursor-pointer ${publicable ? "accent-brand-600" : "accent-gray-500"}`}
                                                     />
                                                 </td>
-                                                <td className="px-4 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                                                    {prog.numero_os}
+                                                <td className={`${td} font-medium text-gray-900`}>{prog.numero_os}</td>
+                                                <td className={td}>{prog.nombre || "—"}</td>
+                                                <td className={td}>{prog.municipio || "—"}</td>
+                                                <td className={td}>
+                                                    <TecnicoBadge programacion={prog} />
                                                 </td>
-                                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                    {prog.nombre || "—"}
-                                                </td>
-                                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                    {prog.municipio || "—"}
-                                                </td>
-                                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                    {prog.formulario}
-                                                </td>
-                                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                    {prog.creado_por}
-                                                </td>
-                                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                    {prog.asignado_a}
-                                                </td>
-                                                <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                                    {formatFecha(prog.fecha_estimada_resolucion)}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                <td className={`${td} text-gray-400`}>{prog.asignado_a || "—"}</td>
+                                                <td className={td}>{formatFecha(prog.fecha_estimada_resolucion)}</td>
+                                                <td className={td}>{formatFechaHora(prog.fecha_creacion)}</td>
+                                                <td className={td}>
                                                     <InsertarBadge value={prog.insertar} />
                                                 </td>
-                                                <td className="px-4 py-4 whitespace-nowrap">
+                                                <td className={td}>
                                                     <ValidacionBadge value={prog.validacion} />
+                                                </td>
+                                                <td className={td}>
+                                                    <div className="flex items-center gap-1">
+                                                        {!duplicada && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setDetalleModo("tecnico");
+                                                                    setDetalleId(prog.id);
+                                                                }}
+                                                                title={prog.tecnico_id ? "Cambiar técnico" : "Asignar técnico"}
+                                                                aria-label={`Asignar técnico a OS ${prog.numero_os}`}
+                                                                className={`${btn.icono} ${faltaTecnico ? "text-amber-600" : ""}`}>
+                                                                <Icon name="userCheck" className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDetalleId(prog.id)}
+                                                            title="Ver detalle"
+                                                            aria-label={`Ver detalle de OS ${prog.numero_os}`}
+                                                            className={btn.icono}>
+                                                            <Icon name="eye" className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -316,6 +409,27 @@ const Precargar = () => {
                     </div>
                 )}
             </div>
+
+            {!loadingList && programaciones.length > 0 && (
+                <div className="mt-4 text-sm text-center text-gray-600">
+                    {programaciones.length} pendiente{programaciones.length === 1 ? "" : "s"} · {publicables.length} publicable
+                    {publicables.length === 1 ? "" : "s"} · {selectedIds.length} seleccionada{selectedIds.length === 1 ? "" : "s"}
+                </div>
+            )}
+
+            <Confirmar
+                open={confirmarEliminar}
+                onClose={() => setConfirmarEliminar(false)}
+                onConfirm={handleEliminar}
+                title="Eliminar programaciones"
+                confirmText="Eliminar"
+                peligro
+                busy={busy === "eliminar"}>
+                Se eliminarán <strong>{selectedIds.length}</strong> programación{selectedIds.length === 1 ? "" : "es"} pendiente
+                {selectedIds.length === 1 ? "" : "s"} de la precarga. Esta acción no se puede deshacer.
+            </Confirmar>
+
+            <DetalleOS id={detalleId} open={detalleId !== null} modoInicial={detalleModo} onClose={cerrarDetalle} onChange={() => setHuboCambios(true)} />
         </>
     );
 };

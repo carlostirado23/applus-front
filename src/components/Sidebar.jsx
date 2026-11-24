@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
 
-const menuItems = [
+// `roles` limita el ítem a esos roles; sin `roles` lo ven todos los del panel.
+const MENU = [
   { path: '/dashboard', label: 'Dashboard', icon: 'grid' },
   {
     label: 'Programación',
@@ -10,18 +12,22 @@ const menuItems = [
     submenu: [
       { path: '/precargar', label: 'Precargar' },
       { path: '/historico', label: 'Histórico' },
+      { path: '/resultados', label: 'Resultados' },
     ],
   },
+  { path: '/reportes', label: 'Reportes', icon: 'barChart' },
+  { path: '/usuarios', label: 'Usuarios', icon: 'users', roles: ['ADMIN'] },
 ];
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const { pathname } = useLocation();
+  const { rol } = useAuth();
+  const menuItems = MENU.filter((item) => !item.roles || item.roles.includes(rol));
+
   // Arranca abierto si la ruta actual pertenece al submenú.
   const [openMenus, setOpenMenus] = useState(() =>
     Object.fromEntries(
-      menuItems
-        .filter((item) => item.submenu?.some((sub) => sub.path === pathname))
-        .map((item) => [item.label, true])
+      MENU.filter((item) => item.submenu?.some((sub) => sub.path === pathname)).map((item) => [item.label, true])
     )
   );
 
@@ -116,6 +122,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               )
             )}
           </nav>
+
+          <div className="p-4 text-xs text-gray-500 border-t border-gray-800">
+            Rol: <span className="font-semibold text-gray-300">{rol === 'ADMIN' ? 'Administrador' : 'Supervisor'}</span>
+          </div>
         </div>
       </aside>
     </>
